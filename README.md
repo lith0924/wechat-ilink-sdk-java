@@ -4,14 +4,22 @@
 
 ---
 
-## 📦 Maven 依赖
+## 📦 依赖配置
+
+### Maven
 
 ```xml
 <dependency>
-    <groupId>暂未发布</groupId>
-    <artifactId>暂未发布</artifactId>
-    <version>1.0.0</version>
+    <groupId>io.github.lith0924</groupId>
+    <artifactId>wechat-ilink-sdk</artifactId>
+    <version>1.0.1</version>
 </dependency>
+```
+
+### Gradle
+
+```groovy
+implementation 'io.github.lith0924:wechat-ilink-sdk:1.0.1'
 ```
 
 ---
