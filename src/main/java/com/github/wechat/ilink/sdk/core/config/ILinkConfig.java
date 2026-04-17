@@ -11,16 +11,19 @@ public final class ILinkConfig {
   private final long loginTimeoutMs;
   private final boolean heartbeatEnabled;
   private final long heartbeatIntervalMs;
-  private final int reconnectMaxAttempts;
-  private final long reconnectBaseDelayMs;
-  private final long reconnectMaxDelayMs;
+
   private final int ioCoreThreads;
   private final int ioMaxThreads;
   private final int schedulerThreads;
   private final int queueCapacity;
   private final String channelVersion;
+//  好像没用
   private final String routeTag;
+//  好像不太适用
   private final boolean autoReconnectEnabled;
+  private final int reconnectMaxAttempts;
+  private final long reconnectBaseDelayMs;
+  private final long reconnectMaxDelayMs;
 
   private ILinkConfig(Builder b) {
     this.connectTimeoutMs = b.connectTimeoutMs;
