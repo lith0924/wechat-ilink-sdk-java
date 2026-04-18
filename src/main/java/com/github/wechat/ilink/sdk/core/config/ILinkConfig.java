@@ -17,9 +17,9 @@ public final class ILinkConfig {
   private final int schedulerThreads;
   private final int queueCapacity;
   private final String channelVersion;
-//  好像没用
+  //  好像没用
   private final String routeTag;
-//  好像不太适用
+  //  好像不太适用
   private final boolean autoReconnectEnabled;
   private final int reconnectMaxAttempts;
   private final long reconnectBaseDelayMs;

@@ -26,6 +26,7 @@ public final class ContextKey {
     ContextKey k = (ContextKey) o;
     return botId.equals(k.botId) && userId.equals(k.userId);
   }
+
   @Override
   public int hashCode() {
     return Objects.hash(botId, userId);

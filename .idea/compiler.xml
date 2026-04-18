@@ -6,7 +6,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="ilink-enterprise-sdk" />
+        <module name="wechat-ilink-sdk-java" />
       </profile>
     </annotationProcessing>
   </component>

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public final class RandomUtils {
   private static final SecureRandom R = new SecureRandom();
-    private static final SecureRandom RANDOM = new SecureRandom();
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   private RandomUtils() {}
 
@@ -23,13 +23,14 @@ public final class RandomUtils {
         + "-"
         + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
   }
-    public static String randomHex(int bytes) {
-        byte[] buf = new byte[bytes];
-        RANDOM.nextBytes(buf);
-        StringBuilder sb = new StringBuilder(bytes * 2);
-        for (byte b : buf) {
-            sb.append(String.format("%02x", b & 0xff));
-        }
-        return sb.toString();
+
+  public static String randomHex(int bytes) {
+    byte[] buf = new byte[bytes];
+    RANDOM.nextBytes(buf);
+    StringBuilder sb = new StringBuilder(bytes * 2);
+    for (byte b : buf) {
+      sb.append(String.format("%02x", b & 0xff));
     }
+    return sb.toString();
+  }
 }
