@@ -43,7 +43,7 @@ public class HttpClientFacade {
           for (Map.Entry<String, String> e : headers.entrySet())
             b.addHeader(e.getKey(), e.getValue());
         if ("POST".equals(method))
-          b.post(RequestBody.create(body, MediaType.parse("application/json; charset=utf-8")));
+          b.post(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), body));
         else b.get();
         try (Response r = client.newCall(b.build()).execute()) {
           if (!r.isSuccessful()) throw new IOException(method + " failed code=" + r.code());
@@ -65,7 +65,7 @@ public class HttpClientFacade {
     Request req =
         new Request.Builder()
             .url(url)
-            .post(RequestBody.create(data, MediaType.parse("application/octet-stream")))
+            .post(RequestBody.create(MediaType.parse("application/octet-stream"), data))
             .build();
     try (Response r = client.newCall(req).execute()) {
       if (!r.isSuccessful()) throw new IOException("upload failed code=" + r.code());

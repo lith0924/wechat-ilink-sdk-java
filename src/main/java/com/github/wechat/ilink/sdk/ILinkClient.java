@@ -72,7 +72,7 @@ public class ILinkClient implements AutoCloseable {
         return new ILinkClientBuilder();
     }
 
-    public ILinkClient(ILinkConfig config, ListenerRegistry listenerRegistry) {
+    public ILinkClient(ILinkConfig config, ListenerRegistry listenerRegistry,LoginContext loginContext) {
         this.config = config;
         this.listenerRegistry = listenerRegistry;
         this.executorManager = new ExecutorManager(config);
@@ -92,6 +92,11 @@ public class ILinkClient implements AutoCloseable {
         this.mediaService = new MediaService(config, businessApiClient, httpClientFacade);
         this.messageService = new MessageService(config, businessApiClient, mediaService);
         this.typingService = new TypingService(config, businessApiClient);
+        //        无需登录直接设置LoginContext
+        if(loginContext!=null){
+            this.loginContext.set(loginContext);
+            loginStatus.toLoggedIn();
+        }
         initHeartbeat();
     }
 
@@ -101,15 +106,12 @@ public class ILinkClient implements AutoCloseable {
             new HeartbeatService(
                 executorManager.scheduler(),
                 config.getHeartbeatIntervalMs(),
-                new HealthChecker() {
-                    @Override
-                    public void check() throws Exception {
+                    () -> {
                         if (!stateManager.isLoggedIn()) return;
                         LoginContext ctx = loginContext.get();
                         if (ctx == null) return;
                         updateService.poll(ctx);
-                    }
-                },
+                    },
                 listenerRegistry);
     }
 
