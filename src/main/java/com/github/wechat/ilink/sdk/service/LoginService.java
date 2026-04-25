@@ -35,8 +35,8 @@ public class LoginService implements AutoCloseable {
 
   public QRCodeResponse getQRCode() throws IOException {
     Map<String, String> headers = new HashMap<String, String>();
-    //        if (config.getRouteTag() != null && !config.getRouteTag().trim().isEmpty())
-    //            headers.put("SKRouteTag", config.getRouteTag());
+    if (config.getRouteTag() != null && !config.getRouteTag().trim().isEmpty())
+    headers.put("SKRouteTag", config.getRouteTag());
     String json = httpClientFacade.get(GET_QRCODE_URL, headers);
     java.util.Map map = serializer.deserialize(json, java.util.Map.class);
     return new QRCodeResponse((String) map.get("qrcode"), (String) map.get("qrcode_img_content"));
@@ -51,51 +51,49 @@ public class LoginService implements AutoCloseable {
     loginStatus.toWaiting();
     CompletableFuture<LoginContext> future =
         CompletableFuture.supplyAsync(
-            new java.util.function.Supplier<LoginContext>() {
-              public LoginContext get() {
-                long deadline = System.currentTimeMillis() + config.getLoginTimeoutMs();
-                while (!Thread.currentThread().isInterrupted()) {
-                  if (System.currentTimeMillis() > deadline) {
-                    loginStatus.toError("login timeout");
-                    throw new ConnectFailedException("login timeout");
+                () -> {
+                  long deadline = System.currentTimeMillis() + config.getLoginTimeoutMs();
+                  while (!Thread.currentThread().isInterrupted()) {
+                    if (System.currentTimeMillis() > deadline) {
+                      loginStatus.toError("login timeout");
+                      throw new ConnectFailedException("login timeout");
+                    }
+                    try {
+                      Map<String, String> headers = new HashMap<String, String>();
+                      headers.put("iLink-App-ClientVersion", "1");
+                      if (config.getRouteTag() != null && !config.getRouteTag().trim().isEmpty())
+                        headers.put("SKRouteTag", config.getRouteTag());
+                      String json =
+                          httpClientFacade.get(GET_QRCODE_STATUS_URL + "?qrcode=" + qrcode, headers);
+                      Map m = serializer.deserialize(json, Map.class);
+                      LoginStatusResponse r = new LoginStatusResponse((String) m.get("status"));
+                      r.setBotToken((String) m.get("bot_token"));
+                      r.setBotId((String) m.get("ilink_bot_id"));
+                      r.setUserId((String) m.get("ilink_user_id"));
+                      r.setBaseUrl((String) m.get("baseurl"));
+                      if (r.isWaiting()) continue;
+                      if (r.isScanned()) {
+                        loginStatus.toScanned();
+                        continue;
+                      }
+                      if (r.isExpired()) {
+                        loginStatus.toExpired();
+                        throw new ConnectFailedException("qrcode expired");
+                      }
+                      if (r.isConfirmed()) {
+                        LoginContext ctx =
+                            new LoginContext(
+                                r.getBotToken(), r.getUserId(), r.getBotId(), r.getBaseUrl());
+                        loginContextRef.set(ctx);
+                        loginStatus.toLoggedIn();
+                        return ctx;
+                      }
+                    } catch (IOException e) {
+                      throw new ConnectFailedException("login polling failed", e);
+                    }
                   }
-                  try {
-                    Map<String, String> headers = new HashMap<String, String>();
-                    headers.put("iLink-App-ClientVersion", "1");
-                    if (config.getRouteTag() != null && !config.getRouteTag().trim().isEmpty())
-                      headers.put("SKRouteTag", config.getRouteTag());
-                    String json =
-                        httpClientFacade.get(GET_QRCODE_STATUS_URL + "?qrcode=" + qrcode, headers);
-                    java.util.Map m = serializer.deserialize(json, java.util.Map.class);
-                    LoginStatusResponse r = new LoginStatusResponse((String) m.get("status"));
-                    r.setBotToken((String) m.get("bot_token"));
-                    r.setBotId((String) m.get("ilink_bot_id"));
-                    r.setUserId((String) m.get("ilink_user_id"));
-                    r.setBaseUrl((String) m.get("baseurl"));
-                    if (r.isWaiting()) continue;
-                    if (r.isScanned()) {
-                      loginStatus.toScanned();
-                      continue;
-                    }
-                    if (r.isExpired()) {
-                      loginStatus.toExpired();
-                      throw new ConnectFailedException("qrcode expired");
-                    }
-                    if (r.isConfirmed()) {
-                      LoginContext ctx =
-                          new LoginContext(
-                              r.getBotToken(), r.getUserId(), r.getBotId(), r.getBaseUrl());
-                      loginContextRef.set(ctx);
-                      loginStatus.toLoggedIn();
-                      return ctx;
-                    }
-                  } catch (IOException e) {
-                    throw new ConnectFailedException("login polling failed", e);
-                  }
-                }
-                throw new ConnectFailedException("login cancelled");
-              }
-            },
+                  throw new ConnectFailedException("login cancelled");
+                },
             pollingExecutor);
     currentLoginFuture.set(future);
     return future;
