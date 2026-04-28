@@ -25,13 +25,17 @@ public class MessageService {
     private final ILinkConfig config;
     private final BusinessApiClient apiClient;
     private final MediaService mediaService;
-    private final ContextPoolManager contextPoolManager = ContextPoolManager.getInstance();
+    private final ContextPoolManager contextPoolManager;
 
     public MessageService(
-        ILinkConfig config, BusinessApiClient apiClient, MediaService mediaService) {
+        ILinkConfig config,
+        BusinessApiClient apiClient,
+        MediaService mediaService,
+        ContextPoolManager contextPoolManager) {
         this.config = config;
         this.apiClient = apiClient;
         this.mediaService = mediaService;
+        this.contextPoolManager = contextPoolManager;
     }
 
     public void sendText(LoginContext loginContext, String toUserId, String text) throws IOException {

@@ -25,18 +25,16 @@ public class HeartbeatService implements AutoCloseable {
     if (future != null && !future.isDone()) return;
     future =
         scheduler.scheduleWithFixedDelay(
-            new Runnable() {
-              public void run() {
-                try {
-                  healthChecker.check();
-                  for (OnHeartbeatListener l : registry.getHeartbeatListeners())
-                    l.onHeartbeatSuccess();
-                } catch (Throwable e) {
-                  for (OnHeartbeatListener l : registry.getHeartbeatListeners())
-                    l.onHeartbeatFailure(e);
-                }
-              }
-            },
+                () -> {
+                  try {
+                    healthChecker.check();
+                    for (OnHeartbeatListener l : registry.getHeartbeatListeners())
+                      l.onHeartbeatSuccess();
+                  } catch (Throwable e) {
+                    for (OnHeartbeatListener l : registry.getHeartbeatListeners())
+                      l.onHeartbeatFailure(e);
+                  }
+                },
             intervalMs,
             intervalMs,
             TimeUnit.MILLISECONDS);

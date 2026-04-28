@@ -3,6 +3,7 @@ package com.github.wechat.ilink.sdk;
 import com.github.wechat.ilink.sdk.core.config.ILinkConfig;
 import com.github.wechat.ilink.sdk.core.context.ContextPoolManager;
 import com.github.wechat.ilink.sdk.core.context.GetUpdatesCursorStore;
+import com.github.wechat.ilink.sdk.core.context.ResumeContext;
 import com.github.wechat.ilink.sdk.core.exception.ILinkException;
 import com.github.wechat.ilink.sdk.core.exception.NotLoginException;
 import com.github.wechat.ilink.sdk.core.executor.ExecutorManager;
@@ -48,7 +49,7 @@ public class ILinkClient implements AutoCloseable {
     private final ListenerRegistry listenerRegistry;
     private final ExecutorManager executorManager;
     private final ClientStateManager stateManager = new ClientStateManager();
-    private final ContextPoolManager contextPoolManager = ContextPoolManager.getInstance();
+    private final ContextPoolManager contextPoolManager = new ContextPoolManager();
     private final GetUpdatesCursorStore cursorStore = new GetUpdatesCursorStore();
 
     private final Serializer serializer;
@@ -72,7 +73,7 @@ public class ILinkClient implements AutoCloseable {
         return new ILinkClientBuilder();
     }
 
-    public ILinkClient(ILinkConfig config, ListenerRegistry listenerRegistry,LoginContext loginContext) {
+    public ILinkClient(ILinkConfig config, ListenerRegistry listenerRegistry, ResumeContext resumeContext) {
         this.config = config;
         this.listenerRegistry = listenerRegistry;
         this.executorManager = new ExecutorManager(config);
@@ -88,16 +89,25 @@ public class ILinkClient implements AutoCloseable {
         this.businessApiClient = new BusinessApiClient(config, serializer, httpClientFacade);
         this.loginService =
             new LoginService(config, serializer, httpClientFacade, executorManager.ioExecutor());
-        this.updateService = new UpdateService(config, businessApiClient, cursorStore);
+        this.updateService =
+            new UpdateService(config, businessApiClient, cursorStore, contextPoolManager);
         this.mediaService = new MediaService(config, businessApiClient, httpClientFacade);
-        this.messageService = new MessageService(config, businessApiClient, mediaService);
-        this.typingService = new TypingService(config, businessApiClient);
-        //        无需登录直接设置LoginContext
-        if(loginContext!=null){
-            this.loginContext.set(loginContext);
+        this.messageService =
+            new MessageService(config, businessApiClient, mediaService, contextPoolManager);
+        this.typingService = new TypingService(config, businessApiClient, contextPoolManager);
+        if (resumeContext != null && resumeContext.getLoginContext() != null) {
+            this.loginContext.set(resumeContext.getLoginContext());
             loginStatus.toLoggedIn();
+            stateManager.set(ConnectionStatus.LOGGED_IN);
+            if (resumeContext.getUpdatesCursor() != null) {
+                cursorStore.put(resumeContext.getUpdatesCursor());
+            }
+            contextPoolManager.restore(resumeContext.getConversationContexts());
         }
         initHeartbeat();
+        if (stateManager.isLoggedIn() && heartbeatService != null) {
+            heartbeatService.start();
+        }
     }
 
     private void initHeartbeat() {
@@ -310,6 +320,17 @@ public class ILinkClient implements AutoCloseable {
 
     public void clearAllContexts() {
         contextPoolManager.clearAll();
+    }
+
+    public ResumeContext exportResumeContext() {
+        LoginContext ctx = loginContext.get();
+        if (ctx == null) {
+            return null;
+        }
+        return ResumeContext.builder(ctx)
+            .updatesCursor(cursorStore.get())
+            .conversationContexts(contextPoolManager.snapshotByUserId())
+            .build();
     }
 
     public void cancelLogin() {

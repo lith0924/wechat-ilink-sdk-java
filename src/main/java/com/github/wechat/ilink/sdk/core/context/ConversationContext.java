@@ -21,6 +21,16 @@ public class ConversationContext {
     this.lastUpdatedAt = System.currentTimeMillis();
   }
 
+  public synchronized ConversationContext snapshot() {
+    ConversationContext copy = new ConversationContext(key);
+    copy.latestContextToken = latestContextToken;
+    copy.typingTicket = typingTicket;
+    copy.lastUpdatedAt = lastUpdatedAt;
+    copy.sourceMessageId = sourceMessageId;
+    copy.sourceMessageTime = sourceMessageTime;
+    return copy;
+  }
+
   public synchronized void clearEphemeral() {
     latestContextToken = null;
     typingTicket = null;

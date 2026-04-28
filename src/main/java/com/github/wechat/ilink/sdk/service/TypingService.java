@@ -11,11 +11,13 @@ import java.io.IOException;
 public class TypingService {
   private final ILinkConfig config;
   private final BusinessApiClient apiClient;
-  private final ContextPoolManager contextPoolManager = ContextPoolManager.getInstance();
+  private final ContextPoolManager contextPoolManager;
 
-  public TypingService(ILinkConfig config, BusinessApiClient apiClient) {
+  public TypingService(
+      ILinkConfig config, BusinessApiClient apiClient, ContextPoolManager contextPoolManager) {
     this.config = config;
     this.apiClient = apiClient;
+    this.contextPoolManager = contextPoolManager;
   }
 
   public String ensureTypingTicket(LoginContext loginContext, String userId) throws IOException {

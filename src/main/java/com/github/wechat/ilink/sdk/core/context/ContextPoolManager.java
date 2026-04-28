@@ -1,19 +1,14 @@
 package com.github.wechat.ilink.sdk.core.context;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ContextPoolManager {
-  private static final ContextPoolManager INSTANCE = new ContextPoolManager();
   private final Map<ContextKey, ConversationContext> pool =
       new ConcurrentHashMap<ContextKey, ConversationContext>();
-
-  private ContextPoolManager() {}
-
-  public static ContextPoolManager getInstance() {
-    return INSTANCE;
-  }
 
   public ConversationContext getOrCreate(String botId, String userId) {
     ContextKey key = new ContextKey(botId, userId);
@@ -44,6 +39,24 @@ public final class ContextPoolManager {
         e.getValue().clearEphemeral();
         pool.remove(e.getKey());
       }
+  }
+
+  public void restore(Collection<ConversationContext> contexts) {
+    if (contexts == null) return;
+    for (ConversationContext ctx : contexts) {
+      if (ctx == null || ctx.getKey() == null) continue;
+      pool.put(ctx.getKey(), ctx.snapshot());
+    }
+  }
+
+  public Map<String, ConversationContext> snapshotByUserId() {
+    Map<String, ConversationContext> snapshots = new LinkedHashMap<String, ConversationContext>();
+    for (ConversationContext ctx : pool.values()) {
+      if (ctx != null && ctx.getKey() != null && ctx.getKey().getUserId() != null) {
+        snapshots.put(ctx.getKey().getUserId(), ctx.snapshot());
+      }
+    }
+    return Collections.unmodifiableMap(snapshots);
   }
 
   public Collection<ConversationContext> values() {

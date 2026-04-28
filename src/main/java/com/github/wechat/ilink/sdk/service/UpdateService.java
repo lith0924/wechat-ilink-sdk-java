@@ -13,17 +13,21 @@ public class UpdateService {
   private final ILinkConfig config;
   private final BusinessApiClient apiClient;
   private final GetUpdatesCursorStore cursorStore;
-  private final ContextPoolManager contextPoolManager = ContextPoolManager.getInstance();
+  private final ContextPoolManager contextPoolManager;
 
   public UpdateService(
-      ILinkConfig config, BusinessApiClient apiClient, GetUpdatesCursorStore cursorStore) {
+      ILinkConfig config,
+      BusinessApiClient apiClient,
+      GetUpdatesCursorStore cursorStore,
+      ContextPoolManager contextPoolManager) {
     this.config = config;
     this.apiClient = apiClient;
     this.cursorStore = cursorStore;
+    this.contextPoolManager = contextPoolManager;
   }
 
   public List<WeixinMessage> poll(LoginContext loginContext) throws IOException {
-    String cursor = cursorStore.get(loginContext.getBotId());
+    String cursor = cursorStore.get();
     if (cursor == null) cursor = "";
     GetUpdatesResponse resp =
         apiClient.post(
@@ -32,7 +36,7 @@ public class UpdateService {
             new GetUpdatesRequest(cursor, new BaseInfo(config.getChannelVersion())),
             GetUpdatesResponse.class);
     if (resp.getGet_updates_buf() != null)
-      cursorStore.put(loginContext.getBotId(), resp.getGet_updates_buf());
+      cursorStore.put(resp.getGet_updates_buf());
     List<WeixinMessage> msgs = resp.getMsgs();
     if (msgs == null) return Collections.<WeixinMessage>emptyList();
     for (WeixinMessage msg : msgs) {
