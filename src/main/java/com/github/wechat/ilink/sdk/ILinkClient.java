@@ -23,6 +23,7 @@ import com.github.wechat.ilink.sdk.core.model.ImageItem;
 import com.github.wechat.ilink.sdk.core.model.MessageItem;
 import com.github.wechat.ilink.sdk.core.model.VideoItem;
 import com.github.wechat.ilink.sdk.core.model.VoiceItem;
+import com.github.wechat.ilink.sdk.core.model.WeixinMessage;
 import com.github.wechat.ilink.sdk.core.retry.ExponentialBackoffStrategy;
 import com.github.wechat.ilink.sdk.core.retry.RetryPolicy;
 import com.github.wechat.ilink.sdk.core.serializer.JsonSerializer;
@@ -68,6 +69,14 @@ public class ILinkClient implements AutoCloseable {
     private volatile CompletableFuture<LoginContext> loginFuture;
     private volatile String qrcode;
     private HeartbeatService heartbeatService;
+
+    /**
+     * Serializes {@link UpdateService#poll} for this client. Concurrent polls (e.g. heartbeat +
+     * {@link #getUpdates}, or two threads calling {@link #getUpdates}) used the same cursor and could
+     * overwrite each other's cursor / drop messages; see
+     * <a href="https://github.com/lith0924/wechat-ilink-sdk-java/issues/5">#5</a>.
+     */
+    private final Object pollLock = new Object();
 
     public static ILinkClientBuilder builder() {
         return new ILinkClientBuilder();
@@ -118,9 +127,8 @@ public class ILinkClient implements AutoCloseable {
                 config.getHeartbeatIntervalMs(),
                     () -> {
                         if (!stateManager.isLoggedIn()) return;
-                        LoginContext ctx = loginContext.get();
-                        if (ctx == null) return;
-                        updateService.poll(ctx);
+                        if (loginContext.get() == null) return;
+                        pollAndDispatchMessages();
                     },
                 listenerRegistry);
     }
@@ -158,10 +166,20 @@ public class ILinkClient implements AutoCloseable {
         }
     }
 
-    public List<com.github.wechat.ilink.sdk.core.model.WeixinMessage> getUpdates()
-        throws IOException {
-        List<com.github.wechat.ilink.sdk.core.model.WeixinMessage> messages =
-            updateService.poll(requireLogin());
+    public List<WeixinMessage> getUpdates() throws IOException {
+        return pollAndDispatchMessages();
+    }
+
+    /**
+     * Single entry for long-poll: serializes {@link UpdateService#poll} per client; notifies {@link
+     * OnMessageListener} after releasing {@link #pollLock} so listeners can safely call {@link
+     * #getUpdates} (including from other threads) without deadlock.
+     */
+    private List<WeixinMessage> pollAndDispatchMessages() throws IOException {
+        final List<WeixinMessage> messages;
+        synchronized (pollLock) {
+            messages = updateService.poll(requireLogin());
+        }
         if (messages != null && !messages.isEmpty()) {
             for (OnMessageListener l : listenerRegistry.getMessageListeners()) {
                 l.onMessages(messages);
