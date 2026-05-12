@@ -701,3 +701,9 @@ MIT License
 
 - GitHub Issues：用于提交 Bug 与使用问题
 - Pull Request：欢迎贡献文档、示例和代码改进
+
+## 💬 交流社群
+
+欢迎大家扫码进群交流问题
+
+<img width="280" alt="社群二维码" src="https://github.com/user-attachments/assets/4397db22-d247-4e3e-bf79-335947003e83" />
