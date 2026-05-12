@@ -36,26 +36,49 @@ public class MediaService {
 
   public UploadedMedia uploadImage(LoginContext c, String toUserId, byte[] bytes, String fileName)
       throws IOException {
-    return upload(c, toUserId, bytes, fileName, 1);
+    return upload(c, toUserId, bytes, fileName, 1, null);
+  }
+
+  public UploadedMedia uploadImageWithThumb(
+      LoginContext c, String toUserId, byte[] imageBytes, byte[] thumbBytes, String fileName)
+      throws IOException {
+    if (thumbBytes == null || thumbBytes.length == 0) {
+      throw new MediaUploadException("thumb bytes required", null);
+    }
+    return upload(c, toUserId, imageBytes, fileName, 1, thumbBytes);
   }
 
   public UploadedMedia uploadVideo(LoginContext c, String toUserId, byte[] bytes, String fileName)
       throws IOException {
-    return upload(c, toUserId, bytes, fileName, 2);
+    return upload(c, toUserId, bytes, fileName, 2, null);
+  }
+
+  public UploadedMedia uploadVideoWithThumb(
+      LoginContext c, String toUserId, byte[] videoBytes, byte[] thumbBytes, String fileName)
+      throws IOException {
+    if (thumbBytes == null || thumbBytes.length == 0) {
+      throw new MediaUploadException("thumb bytes required", null);
+    }
+    return upload(c, toUserId, videoBytes, fileName, 2, thumbBytes);
   }
 
   public UploadedMedia uploadFile(LoginContext c, String toUserId, byte[] bytes, String fileName)
       throws IOException {
-    return upload(c, toUserId, bytes, fileName, 3);
+    return upload(c, toUserId, bytes, fileName, 3, null);
   }
 
   public UploadedMedia uploadVoice(LoginContext c, String toUserId, byte[] bytes, String fileName)
       throws IOException {
-    return upload(c, toUserId, bytes, fileName, 4);
+    return upload(c, toUserId, bytes, fileName, 4, null);
   }
 
   private UploadedMedia upload(
-      LoginContext c, String toUserId, byte[] plain, String fileName, int mediaType)
+      LoginContext c,
+      String toUserId,
+      byte[] plain,
+      String fileName,
+      int mediaType,
+      byte[] thumbPlainOrNull)
       throws IOException {
 
     if (plain == null || plain.length == 0) {
@@ -65,7 +88,6 @@ public class MediaService {
       throw new MediaUploadException("empty toUserId", null);
     }
 
-    // 正确生成 16 字节 AES key => 32 位 hex
     String aesKeyHex = RandomUtils.randomHex(16);
     byte[] aesKeyBytes = HexUtils.decodeHex(aesKeyHex);
 
@@ -76,7 +98,22 @@ public class MediaService {
       throw new MediaUploadException("encrypt media failed", e);
     }
 
-    // filekey 也用稳定随机值，不用 clientId 裁剪
+    boolean withThumb = thumbPlainOrNull != null && thumbPlainOrNull.length > 0;
+    byte[] thumbEncrypted = null;
+    Long thumbRawLen = null;
+    String thumbMd5 = null;
+    Long thumbEncLen = null;
+    if (withThumb) {
+      try {
+        thumbEncrypted = AesEcbUtil.encryptPkcs7(thumbPlainOrNull, aesKeyBytes);
+      } catch (Exception e) {
+        throw new MediaUploadException("encrypt thumb failed", e);
+      }
+      thumbRawLen = (long) thumbPlainOrNull.length;
+      thumbMd5 = HashUtils.md5Hex(thumbPlainOrNull);
+      thumbEncLen = (long) thumbEncrypted.length;
+    }
+
     String filekey = RandomUtils.randomHex(16);
 
     GetUploadUrlRequest req =
@@ -87,9 +124,12 @@ public class MediaService {
             (long) plain.length,
             HashUtils.md5Hex(plain),
             (long) encrypted.length,
-            Boolean.TRUE,
+            withThumb ? Boolean.FALSE : Boolean.TRUE,
             aesKeyHex,
-            new BaseInfo(config.getChannelVersion()));
+            new BaseInfo(config.getChannelVersion()),
+            thumbRawLen,
+            thumbMd5,
+            thumbEncLen);
 
     GetUploadUrlResponse resp =
         apiClient.post(c, "/ilink/bot/getuploadurl", req, GetUploadUrlResponse.class);
@@ -98,16 +138,10 @@ public class MediaService {
       throw new MediaUploadException("empty upload_param", null);
     }
 
-    String uploadUrl =
-        CDN_BASE
-            + "/upload?encrypted_query_param="
-            + URLEncoder.encode(resp.getUpload_param(), StandardCharsets.UTF_8.name())
-            + "&filekey="
-            + URLEncoder.encode(filekey, StandardCharsets.UTF_8.name());
-
+    String mainUploadUrl = cdnUploadUrl(resp.getUpload_param(), filekey);
     String finalEncryptedParam;
     try {
-      finalEncryptedParam = httpClientFacade.uploadBytes(uploadUrl, encrypted);
+      finalEncryptedParam = httpClientFacade.uploadBytes(mainUploadUrl, encrypted);
     } catch (Exception e) {
       throw new MediaUploadException("cdn upload failed", e);
     }
@@ -116,12 +150,12 @@ public class MediaService {
       throw new MediaUploadException("empty x-encrypted-param", null);
     }
 
+    String aesKeyB64 =
+        Base64.getEncoder().encodeToString(aesKeyHex.getBytes(StandardCharsets.UTF_8));
+
     CDNMedia media = new CDNMedia();
     media.setEncrypt_query_param(finalEncryptedParam);
-
-    // 协议兼容：base64(hex string)
-    media.setAes_key(
-        Base64.getEncoder().encodeToString(aesKeyHex.getBytes(StandardCharsets.UTF_8)));
+    media.setAes_key(aesKeyB64);
     media.setEncrypt_type(1);
 
     UploadedMedia out = new UploadedMedia();
@@ -132,7 +166,40 @@ public class MediaService {
     out.setEncryptedSize(encrypted.length);
     out.setMd5(HashUtils.md5Hex(plain));
     out.setFileName(fileName);
+
+    if (withThumb) {
+      String thumbParam = resp.getThumb_upload_param();
+      if (thumbParam == null || thumbParam.trim().isEmpty()) {
+        throw new MediaUploadException("empty thumb_upload_param", null);
+      }
+      String thumbUploadUrl = cdnUploadUrl(thumbParam, filekey);
+      String thumbEncParam;
+      try {
+        thumbEncParam = httpClientFacade.uploadBytes(thumbUploadUrl, thumbEncrypted);
+      } catch (Exception e) {
+        throw new MediaUploadException("cdn thumb upload failed", e);
+      }
+      if (thumbEncParam == null || thumbEncParam.trim().isEmpty()) {
+        throw new MediaUploadException("empty thumb x-encrypted-param", null);
+      }
+      CDNMedia thumbMedia = new CDNMedia();
+      thumbMedia.setEncrypt_query_param(thumbEncParam);
+      thumbMedia.setAes_key(aesKeyB64);
+      thumbMedia.setEncrypt_type(1);
+      out.setThumbMedia(thumbMedia);
+      out.setThumbEncryptedSize(thumbEncLen);
+    }
+
     return out;
+  }
+
+  private static String cdnUploadUrl(String encryptedQueryParam, String filekey)
+      throws IOException {
+    return CDN_BASE
+        + "/upload?encrypted_query_param="
+        + URLEncoder.encode(encryptedQueryParam, StandardCharsets.UTF_8.name())
+        + "&filekey="
+        + URLEncoder.encode(filekey, StandardCharsets.UTF_8.name());
   }
 
   public byte[] downloadMedia(CDNMedia media) throws IOException {

@@ -4,9 +4,11 @@ public class UploadedMedia {
 
   private String filekey;
   private CDNMedia media;
+  private CDNMedia thumbMedia;
   private String aesKeyHex;
   private long rawSize;
   private long encryptedSize;
+  private Long thumbEncryptedSize;
   private String md5;
   private String fileName;
 
@@ -24,6 +26,14 @@ public class UploadedMedia {
 
   public void setMedia(CDNMedia v) {
     media = v;
+  }
+
+  public CDNMedia getThumbMedia() {
+    return thumbMedia;
+  }
+
+  public void setThumbMedia(CDNMedia v) {
+    thumbMedia = v;
   }
 
   public String getAesKeyHex() {
@@ -48,6 +58,14 @@ public class UploadedMedia {
 
   public void setEncryptedSize(long v) {
     encryptedSize = v;
+  }
+
+  public Long getThumbEncryptedSize() {
+    return thumbEncryptedSize;
+  }
+
+  public void setThumbEncryptedSize(Long v) {
+    thumbEncryptedSize = v;
   }
 
   public String getMd5() {

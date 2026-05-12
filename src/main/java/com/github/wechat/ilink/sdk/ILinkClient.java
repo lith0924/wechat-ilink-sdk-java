@@ -9,7 +9,6 @@ import com.github.wechat.ilink.sdk.core.exception.NotLoginException;
 import com.github.wechat.ilink.sdk.core.executor.ExecutorManager;
 import com.github.wechat.ilink.sdk.core.http.BusinessApiClient;
 import com.github.wechat.ilink.sdk.core.http.HttpClientFacade;
-import com.github.wechat.ilink.sdk.core.lifecycle.HealthChecker;
 import com.github.wechat.ilink.sdk.core.lifecycle.HeartbeatService;
 import com.github.wechat.ilink.sdk.core.listener.ListenerRegistry;
 import com.github.wechat.ilink.sdk.core.listener.OnLoginListener;
@@ -214,6 +213,30 @@ public class ILinkClient implements AutoCloseable {
         messageService.sendImage(requireLogin(), toUserId, imageBytes, fileName, caption);
     }
 
+    public void sendImage(
+        String toUserId,
+        byte[] imageBytes,
+        String fileName,
+        String caption,
+        byte[] thumbImageBytes,
+        Integer thumbWidthPx,
+        Integer thumbHeightPx,
+        Long hdEncryptedSize,
+        String previewUrl)
+        throws IOException {
+        messageService.sendImage(
+            requireLogin(),
+            toUserId,
+            imageBytes,
+            fileName,
+            caption,
+            thumbImageBytes,
+            thumbWidthPx,
+            thumbHeightPx,
+            hdEncryptedSize,
+            previewUrl);
+    }
+
     public void sendFile(String toUserId, byte[] fileBytes, String fileName, String caption)
         throws IOException {
         messageService.sendFile(requireLogin(), toUserId, fileBytes, fileName, caption);
@@ -226,11 +249,57 @@ public class ILinkClient implements AutoCloseable {
             requireLogin(), toUserId, voiceBytes, fileName, playTimeMs, sampleRate);
     }
 
+    public void sendVoice(
+        String toUserId,
+        byte[] voiceBytes,
+        String fileName,
+        Integer playTimeMs,
+        Integer sampleRate,
+        String contextTokenOverride,
+        Integer encodeType,
+        Integer bitsPerSample,
+        String transcriptText)
+        throws IOException {
+        messageService.sendVoice(
+            requireLogin(),
+            toUserId,
+            voiceBytes,
+            fileName,
+            playTimeMs,
+            sampleRate,
+            contextTokenOverride,
+            encodeType,
+            bitsPerSample,
+            transcriptText);
+    }
+
     public void sendVideo(
         String toUserId, byte[] videoBytes, String fileName, Integer playLengthMs, String caption)
         throws IOException {
         messageService.sendVideo(
             requireLogin(), toUserId, videoBytes, fileName, playLengthMs, caption);
+    }
+
+    public void sendVideo(
+        String toUserId,
+        byte[] videoBytes,
+        String fileName,
+        Integer playLengthMs,
+        String caption,
+        byte[] thumbImageBytes,
+        Integer thumbWidthPx,
+        Integer thumbHeightPx)
+        throws IOException {
+        messageService.sendVideo(
+            requireLogin(),
+            toUserId,
+            videoBytes,
+            fileName,
+            playLengthMs,
+            caption,
+            thumbImageBytes,
+            thumbWidthPx,
+            thumbHeightPx);
     }
 
     public void startTyping(String toUserId) throws IOException {
@@ -280,6 +349,15 @@ public class ILinkClient implements AutoCloseable {
         return mediaService.downloadMedia(item.getImage_item().getMedia());
     }
 
+    public byte[] downloadImageThumbFromMessageItem(MessageItem item) throws IOException {
+        if (item == null
+            || item.getImage_item() == null
+            || item.getImage_item().getThumb_media() == null) {
+            throw new ILinkException("message item does not contain image thumb_media");
+        }
+        return mediaService.downloadMedia(item.getImage_item().getThumb_media());
+    }
+
     public byte[] downloadFileFromMessageItem(MessageItem item) throws IOException {
         if (item == null || item.getFile_item() == null || item.getFile_item().getMedia() == null) {
             throw new ILinkException("message item does not contain file media");
@@ -299,6 +377,15 @@ public class ILinkClient implements AutoCloseable {
             throw new ILinkException("message item does not contain video media");
         }
         return mediaService.downloadMedia(item.getVideo_item().getMedia());
+    }
+
+    public byte[] downloadVideoThumbFromMessageItem(MessageItem item) throws IOException {
+        if (item == null
+            || item.getVideo_item() == null
+            || item.getVideo_item().getThumb_media() == null) {
+            throw new ILinkException("message item does not contain video thumb_media");
+        }
+        return mediaService.downloadMedia(item.getVideo_item().getThumb_media());
     }
 
     public CompletableFuture<LoginContext> getLoginFuture() {

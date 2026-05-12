@@ -63,17 +63,63 @@ public class MessageService {
         String caption)
         throws IOException {
 
+        sendImage(
+            loginContext,
+            toUserId,
+            imageBytes,
+            fileName,
+            caption,
+            null,
+            null,
+            null,
+            null,
+            null);
+    }
+
+    public void sendImage(
+        LoginContext loginContext,
+        String toUserId,
+        byte[] imageBytes,
+        String fileName,
+        String caption,
+        byte[] thumbImageBytes,
+        Integer thumbWidthPx,
+        Integer thumbHeightPx,
+        Long hdEncryptedSize,
+        String previewUrl)
+        throws IOException {
+
         if (caption != null && !caption.isEmpty()) {
             sendText(loginContext, toUserId, caption);
         }
 
         ConversationContext ctx = requireContext(loginContext, toUserId);
-        UploadedMedia uploaded = mediaService.uploadImage(loginContext, toUserId, imageBytes, fileName);
+
+        UploadedMedia uploaded;
+        if (thumbImageBytes != null && thumbImageBytes.length > 0) {
+            uploaded =
+                mediaService.uploadImageWithThumb(
+                    loginContext, toUserId, imageBytes, thumbImageBytes, fileName);
+        } else {
+            uploaded = mediaService.uploadImage(loginContext, toUserId, imageBytes, fileName);
+        }
 
         ImageItem imageItem = new ImageItem();
         imageItem.setMedia(uploaded.getMedia());
         imageItem.setAeskey(uploaded.getAesKeyHex());
         imageItem.setMid_size(uploaded.getEncryptedSize());
+        if (uploaded.getThumbMedia() != null) {
+            imageItem.setThumb_media(uploaded.getThumbMedia());
+            imageItem.setThumb_size(uploaded.getThumbEncryptedSize());
+            imageItem.setThumb_width(thumbWidthPx);
+            imageItem.setThumb_height(thumbHeightPx);
+        }
+        if (hdEncryptedSize != null) {
+            imageItem.setHd_size(hdEncryptedSize);
+        }
+        if (previewUrl != null && !previewUrl.trim().isEmpty()) {
+            imageItem.setUrl(previewUrl.trim());
+        }
 
         MessageItem item = new MessageItem();
         item.setType(2);
@@ -119,20 +165,65 @@ public class MessageService {
         Integer sampleRate)
         throws IOException {
 
-        ConversationContext ctx = requireContext(loginContext, toUserId);
+        sendVoice(
+            loginContext,
+            toUserId,
+            voiceBytes,
+            fileName,
+            playTimeMs,
+            sampleRate,
+            null,
+            null,
+            null,
+            null);
+    }
+
+    /**
+     * 未指定 {@code encodeType} 时默认 6（SILK）；未指定 {@code bitsPerSample} 时默认 16。
+     */
+    public void sendVoice(
+        LoginContext loginContext,
+        String toUserId,
+        byte[] voiceBytes,
+        String fileName,
+        Integer playTimeMs,
+        Integer sampleRate,
+        String contextTokenOverride,
+        Integer encodeType,
+        Integer bitsPerSample,
+        String transcriptText)
+        throws IOException {
+
+        String contextToken = resolveContextToken(loginContext, toUserId, contextTokenOverride);
+
         UploadedMedia uploaded = mediaService.uploadVoice(loginContext, toUserId, voiceBytes, fileName);
 
         VoiceItem voiceItem = new VoiceItem();
         voiceItem.setMedia(uploaded.getMedia());
-        voiceItem.setEncode_type(7);
+        voiceItem.setEncode_type(encodeType != null ? encodeType : Integer.valueOf(6));
+        voiceItem.setBits_per_sample(bitsPerSample != null ? bitsPerSample : Integer.valueOf(16));
         voiceItem.setPlaytime(playTimeMs);
         voiceItem.setSample_rate(sampleRate);
+        if (transcriptText != null && !transcriptText.isEmpty()) {
+            voiceItem.setText(transcriptText);
+        }
 
         MessageItem item = new MessageItem();
         item.setType(3);
         item.setVoice_item(voiceItem);
 
-        doSend(loginContext, toUserId, ctx.getLatestContextToken(), item);
+        doSend(loginContext, toUserId, contextToken, item);
+    }
+
+    private String resolveContextToken(
+        LoginContext loginContext, String toUserId, String contextTokenOverride) {
+        if (contextTokenOverride != null) {
+            String t = contextTokenOverride.trim();
+            if (!t.isEmpty()) {
+                return t;
+            }
+        }
+        return requireContext(loginContext, toUserId).getLatestContextToken();
     }
 
     public void sendVideo(
@@ -144,18 +235,48 @@ public class MessageService {
         String caption)
         throws IOException {
 
+        sendVideo(
+            loginContext, toUserId, videoBytes, fileName, playLengthMs, caption, null, null, null);
+    }
+
+    public void sendVideo(
+        LoginContext loginContext,
+        String toUserId,
+        byte[] videoBytes,
+        String fileName,
+        Integer playLengthMs,
+        String caption,
+        byte[] thumbImageBytes,
+        Integer thumbWidthPx,
+        Integer thumbHeightPx)
+        throws IOException {
+
         if (caption != null && !caption.isEmpty()) {
             sendText(loginContext, toUserId, caption);
         }
 
         ConversationContext ctx = requireContext(loginContext, toUserId);
-        UploadedMedia uploaded = mediaService.uploadVideo(loginContext, toUserId, videoBytes, fileName);
+
+        UploadedMedia uploaded;
+        if (thumbImageBytes != null && thumbImageBytes.length > 0) {
+            uploaded =
+                mediaService.uploadVideoWithThumb(
+                    loginContext, toUserId, videoBytes, thumbImageBytes, fileName);
+        } else {
+            uploaded = mediaService.uploadVideo(loginContext, toUserId, videoBytes, fileName);
+        }
 
         VideoItem videoItem = new VideoItem();
         videoItem.setMedia(uploaded.getMedia());
         videoItem.setVideo_size(uploaded.getEncryptedSize());
         videoItem.setPlay_length(playLengthMs);
         videoItem.setVideo_md5(uploaded.getMd5());
+        if (uploaded.getThumbMedia() != null) {
+            videoItem.setThumb_media(uploaded.getThumbMedia());
+            videoItem.setThumb_size(uploaded.getThumbEncryptedSize());
+            videoItem.setThumb_width(thumbWidthPx);
+            videoItem.setThumb_height(thumbHeightPx);
+        }
 
         MessageItem item = new MessageItem();
         item.setType(5);

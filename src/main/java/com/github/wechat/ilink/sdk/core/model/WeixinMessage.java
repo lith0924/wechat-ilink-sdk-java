@@ -4,6 +4,7 @@ import java.util.List;
 
 public class WeixinMessage {
   private Long message_id;
+  private Integer message_type;
   private String from_user_id;
   private String to_user_id;
   private Long create_time_ms;
@@ -16,6 +17,14 @@ public class WeixinMessage {
 
   public void setMessage_id(Long v) {
     message_id = v;
+  }
+
+  public Integer getMessage_type() {
+    return message_type;
+  }
+
+  public void setMessage_type(Integer v) {
+    message_type = v;
   }
 
   public String getFrom_user_id() {
