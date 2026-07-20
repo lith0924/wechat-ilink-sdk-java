@@ -7,6 +7,7 @@ public class MessageItem {
   private FileItem file_item;
   private VoiceItem voice_item;
   private VideoItem video_item;
+  private RefMessage ref_msg;
 
   public static MessageItem text(String text) {
     MessageItem item = new MessageItem();
@@ -61,5 +62,24 @@ public class MessageItem {
 
   public void setVideo_item(VideoItem v) {
     video_item = v;
+  }
+
+  public RefMessage getRef_msg() {
+    return ref_msg;
+  }
+
+  public void setRef_msg(RefMessage v) {
+    ref_msg = v;
+  }
+
+  public boolean hasRefMessage() {
+    return ref_msg != null;
+  }
+
+  public String getRefMessageText() {
+    if (ref_msg == null) {
+      return null;
+    }
+    return ref_msg.getText();
   }
 }
